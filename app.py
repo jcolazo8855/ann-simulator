@@ -209,7 +209,7 @@ with neuron_tab:
             initial = float(index == 1)
         raw.append(controls[index % 2].number_input(
             f"x{index + 1} · {feature.name}", float(feature.low), float(feature.high),
-            round(initial, 6), float(feature.step), key=f"example:{case_name}:{index}",
+            float(round(initial, 6)), float(feature.step), key=f"example:{case_name}:{index}",
         ))
     model_inputs = case.encode(np.array(raw, dtype=float))
     values, sums = model.forward(model_inputs[None, :], weights, biases)
