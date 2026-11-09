@@ -51,8 +51,12 @@ def activation_chart(name, z, a, activate):
     ).properties(height=235)
 
 
-def network_svg(labels, snapshot, selected, values, sums, activations, input_labels, raw, output, focus_only):
+def network_svg(
+    labels, snapshot, selected, values, sums, activations, input_labels, raw, output, focus_only,
+    *, previous_weights,
+):
     weights, masks = snapshot["weights"], snapshot["masks"]
+    gradients = snapshot.get("gradients")
     width = 220 + 225 * (len(labels) - 1)
     x = np.linspace(110, width - 110, len(labels))
     half_widths = [91, *([49] * (len(labels) - 2)), 76]
@@ -74,9 +78,14 @@ def network_svg(labels, snapshot, selected, values, sums, activations, input_lab
             dash = ' stroke-dasharray="4 5"' if not active else ""
             status = "Available" if active else "Dropped during this update"
             contribution = values[layer][0, i] * value
+            update = ""
+            if gradients is not None:
+                before = previous_weights[layer][i, j]
+                update = f"Before {before:+.6g} · gradient {gradients[layer][i, j]:+.6g} · change {value - before:+.6g}\n"
             label = escape(
                 f"{labels[layer][i]} → {labels[layer + 1][j]}\n"
                 f"Weight {value:+.6g} · {status}\n"
+                f"{update}"
                 f"Prediction contribution {contribution:+.6g}"
             )
             x1, x2 = x[layer] + half_widths[layer], x[layer + 1] - half_widths[layer + 1]

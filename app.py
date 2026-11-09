@@ -249,6 +249,8 @@ def render_run():
     labels.append(("ŷ",))
 
     with overview:
+        previous_weights = model.history[focus - 1]["weights"] if focus else None
+        gradients = snapshot.get("gradients")
         connections = [
             (layer, i, j) for layer, w in enumerate(weights) for i, j in np.ndindex(w.shape)
         ]
@@ -277,6 +279,7 @@ def render_run():
             st.iframe(network_svg(
                 labels, snapshot, selected, values, sums, model.activations,
                 [feature.name for feature in case.features], raw, (output_label, example_prediction), focus_only,
+                previous_weights=previous_weights,
             ))
             dropped = sum(mask.size - np.count_nonzero(mask) for mask in snapshot["masks"])
             st.caption(
@@ -285,9 +288,44 @@ def render_run():
                 + (f" at a {snapshot['drop_rate']:.0%} drop probability." if focus else " at initialization.")
             )
             st.caption(
-                "The labeled weights feed the highlighted neuron. Hover over any visible link for its weight "
+                "The labeled weights feed the highlighted neuron. Hover over a link for its weight and update "
                 "or a neuron for its activation, weighted sum, and bias. The prediction uses the full network."
             )
+
+        layer, i, j = selected
+        after = weights[layer][i, j]
+        st.subheader("How this weight changed")
+        st.caption(f"{labels[layer][i]} → {labels[layer + 1][j]} · Iteration {focus:,}")
+        if focus == 0:
+            st.markdown(f"**Initial weight** `{after:+.7g}`. Train one step to see its first gradient.")
+        else:
+            before = previous_weights[layer][i, j]
+            status = "Used in this update" if snapshot["masks"][layer][i, j] else "Dropped for this update"
+            if gradients is not None:
+                gradient = gradients[layer][i, j]
+                step_rate = snapshot["learning_rate"]
+                st.markdown("**New weight = previous weight − learning rate × gradient**")
+                st.markdown(f"`{before:+.7g} − {step_rate:.7g} × ({gradient:+.7g}) ≈ {after:+.7g}`")
+                st.caption(f"Gradient {gradient:+.7g} · change {after - before:+.7g} · {status}")
+            else:
+                st.caption(f"Weight {before:+.7g} → {after:+.7g} · {status}. Train one more step to record a gradient.")
+        st.caption(
+            "The gradient comes from the training batch before the update, using that step’s connection mask. "
+            "The cost chart shows the full network after the update."
+        )
+        with st.expander("View all weight updates at this iteration"):
+            st.dataframe(pd.DataFrame([
+                {
+                    "From": labels[l][src],
+                    "To": labels[l + 1][dest],
+                    "Weight before": previous_weights[l][src, dest] if focus else None,
+                    "Gradient": gradients[l][src, dest] if gradients is not None else None,
+                    "Weight change": weights[l][src, dest] - previous_weights[l][src, dest] if focus else None,
+                    "Weight after": weights[l][src, dest],
+                    "Used in update": bool(snapshot["masks"][l][src, dest]) if focus else None,
+                }
+                for l, src, dest in connections
+            ]), hide_index=True, width="stretch")
 
         st.subheader("Cost by iteration")
         cost_rows = pd.DataFrame({
@@ -305,26 +343,19 @@ def render_run():
             f"{loss} evaluated with all connections active. "
             + ("Sales cost uses standardized dollars. The MAE tile reports dollars." if case.regression else "Accuracy uses a 0.50 probability cutoff.")
         )
-        st.subheader("Weight by iteration")
-        layer, i, j = selected
-        weight_history = np.array([row["weights"][layer][i, j] for row in model.history])
-        mask_history = [row["masks"][layer][i, j] for row in model.history]
-        st.altair_chart(history_chart(pd.DataFrame({
-            "Iteration": range(len(weight_history)), "Weight": weight_history,
-        }), "Weight", focus), width="stretch")
-        change = weight_history[focus] - weight_history[max(0, focus - 1)]
-        status = "Initial weight" if focus == 0 else "Kept for update" if mask_history[focus] else "Dropped for update"
-        st.caption(f"{status} · weight {weight_history[focus]:+.5f} · change from preceding iteration {change:+.5f}")
-        with st.expander("View all connection weights at this iteration"):
-            st.dataframe(pd.DataFrame([
-                {
-                    "From": labels[l][src], "To": labels[l + 1][dest],
-                    "Weight": weights[l][src, dest],
-                    "Change": weights[l][src, dest] - model.history[max(0, focus - 1)]["weights"][l][src, dest],
-                    "Used in update": bool(snapshot["masks"][l][src, dest]) if focus else None,
-                }
-                for l, src, dest in connections
-            ]), hide_index=True, width="stretch")
+        st.subheader("Connection history")
+        quantity = st.radio("Plot for the selected connection", ("Weight", "Gradient"), horizontal=True)
+        history_key = "weights" if quantity == "Weight" else "gradients"
+        series = [
+            row[history_key][layer][i, j] if row.get(history_key) is not None else None
+            for row in model.history
+        ]
+        if any(value is not None for value in series):
+            st.altair_chart(history_chart(pd.DataFrame({
+                "Iteration": range(len(series)), quantity: series,
+            }), quantity, focus), width="stretch")
+        else:
+            st.caption("Train one step to plot the gradient.")
         st.caption(
             "A new mask is sampled on every step. Dropped weights receive zero update. "
             "Kept weights are scaled by 1 ÷ (1 − drop probability) during training. Predictions use the full network."

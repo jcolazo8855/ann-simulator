@@ -25,6 +25,8 @@ Use **Play** in **Train live** mode to watch one new weight update per frame. In
 
 Open **Edit example inputs** to change the values flowing through the network snapshot. Each input shows the entered value and the standardized value the model receives. Choose a connection to label the weights feeding its destination neuron, or focus the diagram on just those links. Hover over a link for its weight or over a hidden or output node for its weighted sum, bias, and activation.
 
+After a training step, **How this weight changed** shows the selected connection’s previous weight, learning rate, gradient, and updated weight. Open **View all weight updates at this iteration** to compare connections, or select **Gradient** under **Connection history** to follow the selected gradient over time. Replay uses the learning rate and gradient recorded at each step.
+
 Each update draws a new independent random mask for the connections. Dropped weights receive zero gradient in that update. Kept weights are scaled by the inverse keep probability during training. The cost chart and predictions use all connections.
 
 Customer churn and sales use fixed synthetic training and holdout sets. The XOR panel checks the four canonical input patterns. Sales cost is computed on standardized targets and the evaluation MAE is converted to dollars. The active run lives in session memory. The app uses synthetic data and requires no credentials.

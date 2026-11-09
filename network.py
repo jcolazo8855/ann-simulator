@@ -79,12 +79,14 @@ class Network:
         activations, sums = self.forward(x)
         return float(cost_and_gradient(self.loss, sums[-1], activations[-1], y)[0])
 
-    def record(self, masks, drop_rate):
+    def record(self, masks, drop_rate, gradients=None, learning_rate=None):
         self.history.append({
             "weights": [w.copy() for w in self.weights],
             "biases": [b.copy() for b in self.biases],
             "masks": masks,
             "drop_rate": drop_rate,
+            "gradients": gradients,
+            "learning_rate": learning_rate,
             "training_cost": self.evaluate(self.x, self.y),
             "evaluation_cost": self.evaluate(self.eval_x, self.eval_y),
         })
@@ -98,17 +100,19 @@ class Network:
         _, delta, is_logit_gradient = cost_and_gradient(self.loss, sums[-1], activations[-1], self.y)
         delta = delta / len(self.x)
         next_weights, next_biases = self.weights.copy(), self.biases.copy()
+        gradients = [None] * len(self.weights)
         for layer in reversed(range(len(self.weights))):
             if layer != len(self.weights) - 1 or not is_logit_gradient:
                 delta = delta * activation_slope(self.activations[layer], sums[layer], activations[layer + 1])
             gradient = (activations[layer].T @ delta) * scales[layer]
+            gradients[layer] = gradient
             next_weights[layer] = self.weights[layer] - learning_rate * gradient
             next_biases[layer] = self.biases[layer] - learning_rate * delta.sum(axis=0)
             delta = delta @ effective[layer].T
         previous_weights, previous_biases = self.weights, self.biases
         self.weights, self.biases = next_weights, next_biases
         with np.errstate(over="ignore", invalid="ignore"):
-            self.record(masks, drop_rate)
+            self.record(masks, drop_rate, gradients, learning_rate)
         if not all(np.isfinite(self.history[-1][name]) for name in ("training_cost", "evaluation_cost")):
             self.history.pop()
             self.weights, self.biases = previous_weights, previous_biases
