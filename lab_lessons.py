@@ -172,12 +172,12 @@ def render_ols_demo(case, raw):
     st.dataframe(pd.DataFrame({
         "Term": ["Intercept / bias", *[feature.name for feature in case.features]],
         "OLS coefficient": coefficients,
-        "Neuron parameter": np.r_[bias, weights],
+        "Neuron parameter": np.round(np.r_[bias, weights], 6) + 0.0,
     }), hide_index=True, width="stretch")
     with st.expander("How OLS coefficients become neuron parameters"):
         st.write("Use the training-set means and standard deviations for each input and for sales.")
         st.latex(
-            r"w_j=\beta_j\frac{\sigma_j}{\sigma_y},\qquad"
+            r"w_j=\beta_j\frac{\sigma_j}{\sigma_y},\qquad "
             r"b=\frac{\beta_0+\sum_j\beta_j\mu_j-\mu_y}{\sigma_y}"
         )
         st.latex(r"\hat y_{\mathrm{dollars}}=\mu_y+\sigma_y\hat y_{\mathrm{model}}")

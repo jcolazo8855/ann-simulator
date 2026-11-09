@@ -10,7 +10,7 @@ import streamlit as st
 from cases import LESSONS, make_case
 from lab_charts import ORANGE, TEAL, activation_chart, history_chart, network_svg
 from lab_network import ACTIVATIONS, CLASSIFICATION_LOSSES, MAX_ITERATIONS, REGRESSION_LOSSES, Network, activate, train
-from teaching_demos import BACKPROP_TAB, OLS_TAB, render_backprop_demo, render_ols_demo
+from lab_lessons import BACKPROP_TAB, OLS_TAB, render_backprop_demo, render_ols_demo
 
 st.set_page_config(page_title="Neural Network Lab", page_icon="🧠", layout="wide")
 st.html("""
