@@ -130,18 +130,78 @@ weights, biases = snapshot["weights"], snapshot["biases"]
 predictions = model.forward(case.eval_x, weights, biases)[0][-1].ravel()
 actual = case.eval_y.ravel()
 metric = np.mean(np.abs(case.decode_target(predictions) - case.decode_target(actual))) if case.regression else np.mean((predictions >= 0.5) == actual)
-cards = st.columns(4)
-cards[0].metric("Iteration", f"{focus:,} / {model.iteration:,}")
-cards[1].metric("Training cost", f"{train_cost:.5f}", f"{train_cost - model.history[0]['training_cost']:+.5f}" if focus else None, delta_color="inverse")
-cards[2].metric(f"{eval_name} cost", f"{eval_cost:.5f}")
-cards[3].metric(f"{eval_name} {'MAE' if case.regression else 'accuracy'}", f"${metric:,.0f}" if case.regression else f"{metric:.1%}")
 
-overview, neuron_tab, predictions_tab = st.tabs(["Training & weights", "Neuron microscope", "Predictions & activity"])
+with st.expander("Edit example inputs"):
+    st.caption("These values feed the network diagram and the Neuron microscope.")
+    controls = st.columns(2)
+    raw = []
+    for index, feature in enumerate(case.features):
+        initial = feature.low + round((float(case.center[index]) - feature.low) / feature.step) * feature.step
+        if case_name == "XOR challenge":
+            initial = float(index == 1)
+        raw.append(controls[index % 2].number_input(
+            f"x{index + 1} · {feature.name}", float(feature.low), float(feature.high),
+            float(round(initial, 6)), float(feature.step), key=f"example:{case_name}:{index}",
+        ))
+model_inputs = case.encode(np.array(raw, dtype=float))
+values, sums = model.forward(model_inputs[None, :], weights, biases)
+output = float(values[-1][0, 0])
+if case.regression:
+    output_label, prediction_label = "Weekly sales", "Predicted weekly sales"
+    example_prediction = f"${case.decode_target(output):,.0f}"
+elif case_name == "Customer churn":
+    output_label, prediction_label = "Churn probability", "Predicted churn probability"
+    example_prediction = f"{output:.1%}"
+else:
+    output_label, prediction_label = "P(XOR = 1)", "Predicted probability of XOR = 1"
+    example_prediction = f"{output:.1%}"
+
+overview, neuron_tab, predictions_tab = st.tabs(["Network & training", "Neuron microscope", "Predictions & activity"])
 labels = [tuple(f"x{i + 1}" for i in range(input_count))]
 labels.extend(tuple(f"H{layer}.{node + 1}" for node in range(size)) for layer, size in enumerate(hidden_sizes, 1))
 labels.append(("ŷ",))
 
 with overview:
+    connections = [
+        (layer, i, j) for layer, w in enumerate(weights) for i, j in np.ndindex(w.shape)
+    ]
+    with st.container(border=True):
+        st.subheader("Network snapshot")
+        st.caption(f"{loss} · Costs use the full network and the corresponding dataset.")
+        cards = st.columns(4)
+        cards[0].metric("Iteration", f"{focus:,} / {model.iteration:,}")
+        cards[1].metric(
+            "Training cost", f"{train_cost:.5f}",
+            f"{train_cost - model.history[0]['training_cost']:+.5f}" if focus else None,
+            delta_color="inverse",
+        )
+        cards[2].metric(f"{eval_name} cost", f"{eval_cost:.5f}")
+        cards[3].metric(
+            f"{eval_name} {'MAE' if case.regression else 'accuracy'}",
+            f"${metric:,.0f}" if case.regression else f"{metric:.1%}",
+        )
+        trace, filter_edges = st.columns(2, vertical_alignment="bottom")
+        selected = trace.selectbox(
+            "Connection to trace", connections,
+            format_func=lambda edge: f"{labels[edge[0]][edge[1]]} → {labels[edge[0] + 1][edge[2]]}",
+            key=f"trace:{sizes}",
+        )
+        focus_only = filter_edges.toggle("Only show links into the selected neuron")
+        st.iframe(network_svg(
+            labels, snapshot, selected, values, sums, model.activations,
+            [feature.name for feature in case.features], raw, (output_label, example_prediction), focus_only,
+        ))
+        dropped = sum(mask.size - np.count_nonzero(mask) for mask in snapshot["masks"])
+        st.caption(
+            "Teal = positive weight · orange = negative weight · dashed gray = dropped during the update. "
+            f"{dropped} of {len(connections)} connections dropped"
+            + (f" at a {snapshot['drop_rate']:.0%} drop probability." if focus else " at initialization.")
+        )
+        st.caption(
+            "The labeled weights feed the highlighted neuron. Hover over any visible link for its weight "
+            "or a neuron for its activation, weighted sum, and bias. The prediction uses the full network."
+        )
+
     st.subheader("Cost by iteration")
     cost_rows = pd.DataFrame({
         "Iteration": range(len(model.history)),
@@ -158,22 +218,7 @@ with overview:
         f"{loss} evaluated with all connections active. "
         + ("Sales cost uses standardized dollars. The MAE tile reports dollars." if case.regression else "Accuracy uses a 0.50 probability cutoff.")
     )
-    st.subheader("Follow a connection")
-    connections = [
-        (layer, i, j) for layer, w in enumerate(weights) for i, j in np.ndindex(w.shape)
-    ]
-    selected = st.selectbox(
-        "Connection to trace", connections,
-        format_func=lambda edge: f"{labels[edge[0]][edge[1]]} → {labels[edge[0] + 1][edge[2]]}",
-        key=f"trace:{sizes}",
-    )
-    st.html(network_svg(labels, snapshot, selected))
-    dropped = sum(mask.size - np.count_nonzero(mask) for mask in snapshot["masks"])
-    st.caption(
-        f"Teal = positive weight · orange = negative weight · dashed gray = dropped during this update. "
-        f"{dropped} of {len(connections)} connections dropped"
-        + (f" with {snapshot['drop_rate']:.0%} probability per connection." if focus else " at initialization.")
-    )
+    st.subheader("Weight by iteration")
     layer, i, j = selected
     weight_history = np.array([row["weights"][layer][i, j] for row in model.history])
     mask_history = [row["masks"][layer][i, j] for row in model.history]
@@ -200,25 +245,8 @@ with overview:
 
 with neuron_tab:
     st.subheader("Send an example through the network")
-    st.caption("Edit the inputs to see a prediction and trace the math at the selected iteration.")
-    controls = st.columns(2)
-    raw = []
-    for index, feature in enumerate(case.features):
-        initial = feature.low + round((float(case.center[index]) - feature.low) / feature.step) * feature.step
-        if case_name == "XOR challenge":
-            initial = float(index == 1)
-        raw.append(controls[index % 2].number_input(
-            f"x{index + 1} · {feature.name}", float(feature.low), float(feature.high),
-            float(round(initial, 6)), float(feature.step), key=f"example:{case_name}:{index}",
-        ))
-    model_inputs = case.encode(np.array(raw, dtype=float))
-    values, sums = model.forward(model_inputs[None, :], weights, biases)
-    output = float(values[-1][0, 0])
-    if case.regression:
-        st.metric("Predicted weekly sales", f"${case.decode_target(output):,.0f}")
-    else:
-        label = "Predicted churn probability" if case_name == "Customer churn" else "Predicted probability of XOR = 1"
-        st.metric(label, f"{output:.1%}")
+    st.caption("Use Edit example inputs above to change the prediction and trace the math at the selected iteration.")
+    st.metric(prediction_label, example_prediction)
     left, right = st.columns(2)
     inspected_layer = left.selectbox(
         "Layer to inspect", range(len(weights)),
