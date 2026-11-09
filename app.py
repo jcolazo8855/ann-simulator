@@ -19,8 +19,12 @@ st.html("""
 .nn-hero h1 {color:#fff;font-size:clamp(28px,4vw,46px);line-height:1.15;letter-spacing:-.035em;padding:4px 0;}
 .nn-hero p {color:#dbf0f1;margin:6px 0 0;font-size:15px;}
 .nn-hero .nn-eyebrow {color:#a1f5dc;letter-spacing:.16em;font-size:11px;font-weight:750;}
-[data-testid="stMetric"] {background:#eef5fa;border-radius:12px;padding:10px 14px;}
-[data-testid="stMetricValue"] {font-size:clamp(19px,3vw,29px);}
+[data-testid="stMetric"] {background:#eef5fa;border-radius:12px;padding:10px 14px;container-type:inline-size;}
+[data-testid="stMetricValue"] {font-size:clamp(15px,18cqi,29px);}
+[data-testid="stMetricLabel"] .stMarkdownEllipsis,
+[data-testid="stMetricValue"] .stMarkdownEllipsis {white-space:normal;overflow-wrap:anywhere;}
+.block-container,[data-testid="stBottomBlockContainer"] {padding-inline:clamp(1rem,4vw,5rem);}
+[data-testid="stBottomBlockContainer"] {padding-bottom:1rem;}
 .block-container {padding-top:3.35rem;}
 </style>
 <header class="nn-hero">
@@ -171,19 +175,19 @@ def finish_playback(notice):
 with st.bottom:
     with st.container(horizontal=True, vertical_alignment="bottom"):
         st.button(
-            "Play", icon=":material/play_arrow:", width=95, on_click=play, type="primary",
+            "Play", icon=":material/play_arrow:", width=85, on_click=play, type="primary",
             disabled=st.session_state.playing or (at_cap if mode == LIVE else model.iteration == 0),
         )
         st.button(
-            "Pause", icon=":material/pause:", width=100, on_click=pause_playback,
+            "Pause", icon=":material/pause:", width=92, on_click=pause_playback,
             disabled=not st.session_state.playing,
         )
         st.selectbox(
-            "Playback mode", (LIVE, REPLAY), key="playback_mode", width=225, on_change=pause_playback,
+            "Playback mode", (LIVE, REPLAY), key="playback_mode", width=200, on_change=pause_playback,
             help="Train live makes a new weight update each frame. Replay starts at the selected iteration and stops at the end of the saved run.",
         )
         speed = st.selectbox(
-            "Playback speed", (0.5, 1, 2), index=1, key="playback_speed", width=165,
+            "Playback speed", (0.5, 1, 2), index=1, key="playback_speed", width=145,
             format_func=lambda value: f"{value:g} {'step' if value == 1 else 'steps'}/sec",
             on_change=reset_playback_clock,
         )
