@@ -8,8 +8,8 @@ import pandas as pd
 import streamlit as st
 
 from cases import LESSONS, make_case
-from charts import ORANGE, TEAL, activation_chart, history_chart, network_svg
-from network import ACTIVATIONS, CLASSIFICATION_LOSSES, MAX_ITERATIONS, REGRESSION_LOSSES, Network, activate, train
+from lab_charts import ORANGE, TEAL, activation_chart, history_chart, network_svg
+from lab_network import ACTIVATIONS, CLASSIFICATION_LOSSES, MAX_ITERATIONS, REGRESSION_LOSSES, Network, activate, train
 
 st.set_page_config(page_title="Neural Network Lab", page_icon="🧠", layout="wide")
 st.html("""
@@ -97,6 +97,12 @@ if st.session_state.get("signature") != signature:
     pause_playback()
 
 model = st.session_state.model
+if not isinstance(model, Network):
+    # An open session can still hold the model class from a previous deployment.
+    upgraded = Network(sizes, activations, output_activation, loss, seed, case)
+    upgraded.weights, upgraded.biases = model.weights, model.biases
+    upgraded.history, upgraded.mask_rng = model.history, model.mask_rng
+    st.session_state.model = model = upgraded
 
 
 def reset_model():
