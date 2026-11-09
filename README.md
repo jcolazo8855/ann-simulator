@@ -21,6 +21,8 @@ python -m streamlit run app.py
 
 **Step once** performs one update. **Run 25 steps** advances the same run. **Train to plateau** stops when unmasked training cost fails to improve by the specified tolerance for 100 consecutive updates, or when it hits the step budget. Scrub through completed iterations to see the cost, stored weights, predictions, and connection mask at that point.
 
+Use **Play** in **Train live** mode to watch one new weight update per frame. In **Replay saved iterations** mode, Play resumes from the selected iteration and stops at the end of the saved run. Starting replay at the end plays from iteration zero. **Pause** holds the current frame so you can inspect it or jump to another iteration. **Playback speed** sets the pace from 0.5 to 2 steps per second.
+
 Open **Edit example inputs** to change the values flowing through the network snapshot. Each input shows the entered value and the standardized value the model receives. Choose a connection to label the weights feeding its destination neuron, or focus the diagram on just those links. Hover over a link for its weight or over a hidden or output node for its weighted sum, bias, and activation.
 
 Each update draws a new independent random mask for the connections. Dropped weights receive zero gradient in that update. Kept weights are scaled by the inverse keep probability during training. The cost chart and predictions use all connections.
