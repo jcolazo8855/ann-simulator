@@ -10,6 +10,7 @@ import streamlit as st
 from cases import LESSONS, make_case
 from lab_charts import ORANGE, TEAL, activation_chart, history_chart, network_svg
 from lab_network import ACTIVATIONS, CLASSIFICATION_LOSSES, MAX_ITERATIONS, REGRESSION_LOSSES, Network, activate, train
+from teaching_demos import BACKPROP_TAB, OLS_TAB, render_backprop_demo, render_ols_demo
 
 st.set_page_config(page_title="Neural Network Lab", page_icon="🧠", layout="wide")
 st.html("""
@@ -35,11 +36,12 @@ st.html("""
 """)
 
 case_name = st.segmented_control(
-    "Choose a use case", list(LESSONS), default="Customer churn", key="lesson",
+    "Choose a dataset", list(LESSONS), default="Customer churn", key="lesson",
     format_func=lambda name: f"{LESSONS[name].icon}  {name}", selection_mode="single", required=True,
 )
 lesson = LESSONS[case_name]
-st.write(lesson.description)
+outcome = "Continuous outcome · regression" if case_name == "Sales prediction" else "Binary outcome · classification"
+st.write(f"**{outcome}** · {lesson.description}")
 
 with st.sidebar:
     st.header("Build your network")
@@ -155,6 +157,8 @@ model_inputs = case.encode(np.array(raw, dtype=float))
 
 LIVE, REPLAY = "Train live", "Replay saved iterations"
 mode = st.session_state.get("playback_mode", LIVE)
+teaching_tabs = [BACKPROP_TAB, OLS_TAB] if case.regression else [BACKPROP_TAB]
+in_teaching_tab = st.session_state.get("lab_view") in teaching_tabs
 
 
 def reset_playback_clock():
@@ -182,7 +186,7 @@ with st.bottom:
     with st.container(horizontal=True, vertical_alignment="bottom"):
         st.button(
             "Play", icon=":material/play_arrow:", width=85, on_click=play, type="primary",
-            disabled=st.session_state.playing or (at_cap if mode == LIVE else model.iteration == 0),
+            disabled=in_teaching_tab or st.session_state.playing or (at_cap if mode == LIVE else model.iteration == 0),
         )
         st.button(
             "Pause", icon=":material/pause:", width=92, on_click=pause_playback,
@@ -205,6 +209,11 @@ interval = 1 / speed
 
 @st.fragment(run_every=interval if st.session_state.playing else None)
 def render_run():
+    if (st.session_state.get("lab_view") in teaching_tabs) != in_teaching_tab:
+        if not in_teaching_tab:
+            pause_playback()
+        st.rerun()
+
     if st.session_state.playing and monotonic() - st.session_state.last_frame_at >= interval - 0.05:
         reset_playback_clock()
         if mode == REPLAY:
@@ -249,7 +258,10 @@ def render_run():
         output_label, prediction_label = "P(XOR = 1)", "Predicted probability of XOR = 1"
         example_prediction = f"{output:.1%}"
 
-    overview, neuron_tab, predictions_tab = st.tabs(["Network & training", "Neuron microscope", "Predictions & activity"])
+    overview, neuron_tab, predictions_tab, backprop_tab, *ols_tabs = st.tabs(
+        ["Network & training", "Neuron microscope", "Predictions & activity", *teaching_tabs],
+        key="lab_view", on_change="rerun",
+    )
     labels = [tuple(f"x{i + 1}" for i in range(input_count))]
     labels.extend(tuple(f"H{layer}.{node + 1}" for node in range(size)) for layer, size in enumerate(hidden_sizes, 1))
     labels.append(("ŷ",))
@@ -431,6 +443,13 @@ def render_run():
                     st.warning("Switch B is missing. With only Switch A, the model sees both possible labels for each input.")
         st.dataframe(frame.round(4), hide_index=True, width="stretch")
         st.caption(f"{len(case.train_y)} training rows · {len(case.eval_y)} {eval_name.lower()} rows · synthetic classroom data")
+
+    if backprop_tab.open:
+        with backprop_tab:
+            render_backprop_demo()
+    if ols_tabs and ols_tabs[0].open:
+        with ols_tabs[0]:
+            render_ols_demo(case, raw)
 
 
 render_run()

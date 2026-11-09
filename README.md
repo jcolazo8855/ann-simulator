@@ -19,6 +19,10 @@ python -m streamlit run app.py
 | Sales prediction | Train and inspect the held-out predictions in dollars. Compare the predicted effect of raising ad spend for a low-traffic and a high-traffic store. |
 | XOR challenge | Compare a Linear hidden layer with a Tanh hidden layer. Check all four predictions in the truth table. |
 
+Choose **Customer churn** for a binary outcome or **Sales prediction** for a continuous outcome. The **OLS comparison** tab in Sales prediction fits ordinary least squares on the training set, translates the fitted coefficients into a single linear neuron’s weights and bias, and compares the two predictions for the editable example and the holdout rows.
+
+Open **Backpropagation demo** with any dataset for a six-step walkthrough of a fixed sales example. Follow the prediction, loss, backward derivatives, both weight gradients, and the updated prediction. **Previous step** and **Restart walkthrough** let students revisit the calculation.
+
 **Step once** performs one update. **Run 25 steps** advances the same run. **Train to plateau** stops when unmasked training cost fails to improve by the specified tolerance for 100 consecutive updates, or when it hits the step budget. Scrub through completed iterations to see the cost, stored weights, predictions, and connection mask at that point.
 
 Use **Play** in **Train live** mode to watch one new weight update per frame. In **Replay saved iterations** mode, Play resumes from the selected iteration and stops at the end of the saved run. Starting replay at the end plays from iteration zero. **Pause** holds the current frame so you can inspect it or jump to another iteration. **Playback speed** sets the pace from 0.5 to 2 steps per second.
